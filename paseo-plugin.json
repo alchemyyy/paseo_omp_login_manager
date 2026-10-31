@@ -1,0 +1,6 @@
+{
+  "id": "omp-login-manager",
+  "name": "Login manager",
+  "description": "Shows Claude Code and oh-my-pi (omp) accounts and their authentication status in the sidebar, with one-click re-login that refreshes the matching Paseo provider",
+  "requirements": { "paseo": ">=0.13.0" }
+}
