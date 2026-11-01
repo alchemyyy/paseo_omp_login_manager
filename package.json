@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test server/account-model.test.ts server/login-output.test.ts server/provider-command.test.ts server/login-arguments.test.ts server/redact.test.ts"
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test server/account-model.test.ts server/login-output.test.ts server/provider-command.test.ts server/login-arguments.test.ts server/redact.test.ts server/omp-setup.test.ts"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.13.0",

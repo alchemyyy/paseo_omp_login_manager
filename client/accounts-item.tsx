@@ -31,6 +31,8 @@ interface ContextMenuTarget {
 
 // Catches logins made in a terminal; the server refreshes Paseo when the credentials change
 const ACCOUNTS_POLL_INTERVAL_MS = 60_000;
+// While first-run setup installs omp, so its row follows the steps
+const SETUP_POLL_INTERVAL_MS = 2_000;
 const TRAILING_ICON_SIZE = 14;
 const HIT_SLOP = { top: 6, bottom: 6, left: 6, right: 6 };
 
@@ -75,7 +77,8 @@ export function AccountsItem({ theme, layout, openPopover }: PluginSidebarItemPr
   const accounts = useQuery({
     queryKey: ACCOUNTS_QUERY_KEY,
     queryFn: () => listAccounts({}),
-    refetchInterval: ACCOUNTS_POLL_INTERVAL_MS,
+    refetchInterval: (query) =>
+      query.state.data?.setup?.state === "running" ? SETUP_POLL_INTERVAL_MS : ACCOUNTS_POLL_INTERVAL_MS,
   });
   const statusIcons = useMemo(() => buildStatusIcons(theme), [theme]);
   // Before the first list arrives, offer every backend rather than none
@@ -269,8 +272,9 @@ export function AccountsItem({ theme, layout, openPopover }: PluginSidebarItemPr
   const backendErrors = data?.errors ?? [];
   const muted = theme.colors.foregroundMuted;
 
-  // Neither provider is enabled in Paseo: the section disappears, unless a login window is still open
-  if (data && data.enabledBackends.length === 0 && session === null) return null;
+  // Neither provider is enabled in Paseo: the section disappears, unless setup has something to say
+  // or a login window is still open
+  if (data && data.enabledBackends.length === 0 && data.setup === null && session === null) return null;
 
   return (
     <>
@@ -293,6 +297,20 @@ export function AccountsItem({ theme, layout, openPopover }: PluginSidebarItemPr
           }
         />
       </View>
+      {data?.setup ? (
+        <SidebarRow
+          id="setup"
+          icon={data.setup.state === "running" ? "LoaderCircle" : statusIcons.disabled}
+          label={data.setup.state === "running" ? `${data.setup.message}...` : "omp setup failed"}
+          onPress={() => {
+            if (data.setup?.state !== "failed") return;
+            showError(
+              "omp setup failed",
+              `${data.setup.message}\n\nSetup runs again within 10 minutes, or when the plugin reloads.`,
+            );
+          }}
+        />
+      ) : null}
       {queryError ? (
         <SidebarRow
           id="error"
@@ -310,7 +328,7 @@ export function AccountsItem({ theme, layout, openPopover }: PluginSidebarItemPr
           onPress={() => showError(`${BACKEND_LABELS[backend]} is unavailable`, message)}
         />
       ))}
-      {!queryError && data && rows.length === 0 && backendErrors.length === 0 ? (
+      {!queryError && data && rows.length === 0 && backendErrors.length === 0 && data.setup?.state !== "running" ? (
         <SidebarRow id="empty" icon="LogIn" label="No accounts; log in" onPress={showNewLogin} />
       ) : null}
       {rows.map((account) => (

@@ -76,6 +76,14 @@ export const removeAccountRpc = defineRpc({
   output: z.object({ remainingSource: z.string().nullable() }),
 });
 
+/** First-run setup of omp and Paseo's omp provider, while it installs or configures, or after it failed */
+export const SetupStatusSchema = z.object({
+  state: z.enum(["running", "failed"]),
+  /** The current step ("Installing omp"), or why setup failed */
+  message: z.string(),
+});
+export type SetupStatus = z.infer<typeof SetupStatusSchema>;
+
 export const listAccountsRpc = defineRpc({
   name: "accounts.list",
   input: z.object({}),
@@ -85,6 +93,7 @@ export const listAccountsRpc = defineRpc({
     enabledBackends: z.array(BackendSchema),
     /** Installed backends whose accounts could not be read; missing backends are omitted */
     errors: z.array(z.object({ backend: BackendSchema, message: z.string() })),
+    setup: SetupStatusSchema.nullable(),
     checkedAt: z.number(),
   }),
 });

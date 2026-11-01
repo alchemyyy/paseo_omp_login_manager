@@ -4,24 +4,30 @@ Paseo plugin that lists Claude Code and [oh-my-pi](https://github.com/can1357/oh
 
 ## Install
 
-1. Install [Paseo](https://paseo.sh) (0.13.0 or later) and launch it once. For Claude Code accounts, install [Claude Code](https://claude.com/claude-code).
-2. Run the setup script from the parent `paseo_plugins` folder:
+Requires [Paseo](https://paseo.sh) 0.13.0 or later with plugins turned on (Settings > Plugins > Enable plugins). For Claude Code accounts, install [Claude Code](https://claude.com/claude-code).
 
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File ..\install-omp-paseo.ps1
-   ```
+```sh
+paseo plugin install https://github.com/alchemyyy/paseo_omp_login_manager
+```
 
-   It installs omp (prebuilt binary via omp.sh into `%LOCALAPPDATA%\omp`), backs up `~/.paseo/config.json` to `config.json.bak`, enables Paseo's omp provider (pinned to the absolute `omp.exe`) and plugins, then runs this folder's `install.ps1 -ReloadDaemon`.
-   Options: `-Ref v<version>` pins an omp release. `-PaseoCli <path>` points to `paseo.cmd` if it is not found automatically.
-3. Reload the Paseo window. In the sidebar's **Accounts** section, press **+** and choose Claude Code or omp to log in.
+The first time a Paseo window shows the plugin, it sets up omp on its own and shows each step in the sidebar's **Accounts** section:
 
-`install.ps1` in this folder installs the plugin with `paseo plugin install <folder>`, or runs `paseo plugin reload` if it is already installed; use it after editing the plugin. Options: `-PaseoCli <path>`, and `-ReloadDaemon` to run `paseo daemon reload` first. It warns if plugins are disabled in Paseo's config.
+- It installs omp with omp's official installer (the prebuilt binary, SHA-256 checked, into `%LOCALAPPDATA%\omp`, or `PI_INSTALL_DIR` if set) when omp is missing or older than Paseo's minimum, 16.3.9. This happens on Windows only; on macOS and Linux, install omp first (`curl -fsSL https://omp.sh/install | sh`).
+- It turns on Paseo's omp provider and points it at that omp by absolute path, so a daemon started before omp was on `PATH` still finds it. Settings you made stay: a provider you turned off stays off, and a command you set is kept.
+
+Setup runs once and then records itself in `~/.paseo/plugin-data/omp-login-manager/setup.json` (under `PASEO_HOME` if set); delete that file to run it again. A failed step shows as **omp setup failed** (click it for the reason) and runs again within 10 minutes or when the plugin reloads. Once setup is done, press **+** in the **Accounts** section and choose Claude Code or omp to log in.
+
+`paseo plugin update omp-login-manager` updates the plugin, and `paseo plugin remove omp-login-manager` removes it (omp and its logins stay). The [Plugin manager](https://github.com/alchemyyy/paseo_plugin_manager) plugin checks and updates installed plugins from the sidebar.
+
+The `paseo` command comes with the desktop app: Settings > Integrations > Command line puts it on `PATH`, or run `paseo.cmd` from the app's `resources\bin` folder.
+
+To work on the plugin, clone this repository and install the folder instead (`paseo plugin install <folder>`), then run `paseo plugin reload omp-login-manager` after editing it.
 
 ## Features
 
 ### Accounts sidebar section
 
-- One row per account: `Claude Code · <email>` or `omp <provider> · <label>`. Accounts of a backend whose Paseo provider is disabled are not queried; with both disabled the section is hidden.
+- One row per account: `Claude Code · <email>` or `omp <provider> · <label>`. Accounts of a backend whose Paseo provider is disabled are not queried; with both disabled the section is hidden, unless first-run setup is still working or has failed.
 - Status icon per row: ok (check), expiring (clock), expired (alert), disabled (cross), signed out (dashed circle). omp Anthropic OAuth grants are flagged expiring within 7 days of their ~30-day lifetime and expired after it; omp accounts disabled by omp show the cause. A live `omp usage --json` check marks accounts as verified.
 - Clicking a row opens details (source, org, OAuth/API key, status text) with **Log in again** and **Remove**. The refresh icon on a row re-runs that account's login, pre-filling its email for Claude Code.
 - **Remove** asks for confirmation, then runs `claude auth logout`, or deletes the single omp credential through omp's RPC mode (`--no-session`). If another source such as an environment variable still provides credentials, a warning says so.
@@ -48,4 +54,4 @@ The plugin remembers each pick in `~/.paseo/plugin-data/omp-login-manager/accoun
 - Paseo's plugin SDK has no toolbar slot, so the account control finds the toolbar through the app's internal element ids (`combined-model-selector`, `agent-thinking-selector`, `mode-control`) and works on web/desktop only. A Paseo update that renames them hides the control; switching still works by typing `/session pin <account>` in the chat.
 - Only the first 200 agents get a control at startup; later agents are added as they update.
 - Sign-in pages open in the browser on the Paseo host machine.
-- The install scripts are PowerShell (Windows).
+- omp is installed automatically only on Windows.

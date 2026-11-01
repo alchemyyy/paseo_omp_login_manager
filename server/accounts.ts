@@ -12,6 +12,7 @@ import {
 } from "./account-model";
 import { loadProviderLaunch, type ProviderLaunch } from "./provider-command";
 import { refreshPaseoProvider } from "./paseo-refresh";
+import { ensureSetup, setupStatus } from "./setup";
 
 const AUTH_EXPORT_TIMEOUT_MS = 20_000;
 const USAGE_TIMEOUT_MS = 45_000;
@@ -26,11 +27,12 @@ type BackendResult = { accounts: Account[]; fingerprint: string } | { error: str
 // Last observed credential fingerprint per backend, so a login made in a terminal still refreshes Paseo
 const lastFingerprints = new Map<Backend, string>();
 
-/** Lists omp and Claude Code accounts with their authentication status */
+/** Lists omp and Claude Code accounts with their authentication status; the first list starts first-run setup */
 export async function listAccounts(
   _input: object,
   { paseo }: PluginHandlerContext,
 ): Promise<RpcOutput<typeof listAccountsRpc>> {
+  ensureSetup(paseo);
   const checkedAt = Date.now();
   const enabled = await readEnabledBackends(paseo);
   const readers: Record<Backend, () => Promise<BackendResult>> = {
@@ -53,7 +55,7 @@ export async function listAccounts(
     if (previous !== undefined && previous !== result.fingerprint) refreshPaseoProvider(paseo, backend);
     lastFingerprints.set(backend, result.fingerprint);
   }
-  return { accounts, enabledBackends: enabled, errors, checkedAt };
+  return { accounts, enabledBackends: enabled, errors, setup: setupStatus(), checkedAt };
 }
 
 /** Backends Paseo has enabled; every backend when the snapshot is unavailable, so a hiccup hides nothing */
