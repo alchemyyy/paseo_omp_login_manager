@@ -28,12 +28,12 @@ To work on the plugin, clone this repository and install the folder instead (`pa
 ### Accounts sidebar section
 
 - One row per account: `Claude Code · <email>` or `omp <provider> · <label>`. Accounts of a backend whose Paseo provider is disabled are not queried; with both disabled the section is hidden, unless first-run setup is still working or has failed.
-- Status icon per row: ok (check), expiring (clock), expired (alert), disabled (cross), signed out (dashed circle). omp Anthropic OAuth grants are flagged expiring within 7 days of their ~30-day lifetime and expired after it; omp accounts disabled by omp show the cause. A live `omp usage --json` check marks accounts as verified.
+- Status icon per row: ok (check), expiring (clock), expired (alert), disabled (cross), signed out (dashed circle). omp Anthropic OAuth grants are flagged expiring within 7 days of their ~30-day lifetime and expired after it; omp accounts disabled by omp show the cause. A live `omp usage --json` check marks accounts as verified. That check calls each provider's usage API, which Anthropic rate-limits, so it runs at most every 30 minutes, plus when omp's stored credentials change or you click the header.
 - Clicking a row opens details (source, org, OAuth/API key, status text) with **Log in again** and **Remove**. The refresh icon on a row re-runs that account's login, pre-filling its email for Claude Code.
 - **Remove** asks for confirmation, then runs `claude auth logout`, or deletes the single omp credential through omp's RPC mode (`--no-session`). If another source such as an environment variable still provides credentials, a warning says so.
 - Header: click it to re-check (shows "Accounts (checking)"); **+** opens a menu to log in to Claude Code or omp (omp then asks which provider) and to reload the Paseo window. Right-click the header (web/desktop) to toggle **Hide email addresses**, a host-scoped setting (default off) that masks emails in rows, details, login output, and the account control.
 - Errors appear as "Accounts unavailable" or "<backend> unavailable" rows; click for the message. With no accounts, a "No accounts; log in" row appears. Backends that are not installed are skipped.
-- The list re-checks every 60 seconds and when a provider is toggled in Paseo's settings. When stored credentials change, including logins made in a terminal, the plugin refreshes Paseo's matching provider so models and availability follow.
+- The list re-checks every 60 seconds and when a provider is toggled in Paseo's settings, reading omp's stored credentials locally and reusing the last usage check. When stored credentials change, including logins made in a terminal, the plugin refreshes Paseo's matching provider so models and availability follow.
 
 ### Login window
 

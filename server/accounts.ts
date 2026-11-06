@@ -1,4 +1,4 @@
-import type { RpcOutput } from "@getpaseo/plugin";
+import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import { execCommand } from "@getpaseo/plugin/server";
 import { type Account, type Backend, BackendSchema, enabledBackends, type listAccountsRpc } from "../shared/contracts";
@@ -16,6 +16,9 @@ import { ensureSetup, setupStatus } from "./setup";
 
 const AUTH_EXPORT_TIMEOUT_MS = 20_000;
 const USAGE_TIMEOUT_MS = 45_000;
+// `omp usage --json` calls each provider's usage API, which Anthropic rate-limits per account. The
+// 60-second list reuses the last result until credentials change, a refresh is asked for, or it ages out.
+const USAGE_MAX_AGE_MS = 30 * 60_000;
 const CLAUDE_STATUS_TIMEOUT_MS = 15_000;
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 // cmd.exe's message when a bare command name is not on PATH
@@ -26,17 +29,19 @@ type BackendResult = { accounts: Account[]; fingerprint: string } | { error: str
 
 // Last observed credential fingerprint per backend, so a login made in a terminal still refreshes Paseo
 const lastFingerprints = new Map<Backend, string>();
+// The pending or settled usage check for one credential set, shared by concurrent lists
+let usageCache: { fingerprint: string; startedAt: number; snapshot: Promise<UsageSnapshot | null> } | null = null;
 
 /** Lists omp and Claude Code accounts with their authentication status; the first list starts first-run setup */
 export async function listAccounts(
-  _input: object,
+  { refresh }: RpcInput<typeof listAccountsRpc>,
   { paseo }: PluginHandlerContext,
 ): Promise<RpcOutput<typeof listAccountsRpc>> {
   ensureSetup(paseo);
   const checkedAt = Date.now();
   const enabled = await readEnabledBackends(paseo);
   const readers: Record<Backend, () => Promise<BackendResult>> = {
-    omp: () => readOmp(checkedAt),
+    omp: () => readOmp(checkedAt, refresh === true),
     claude: readClaude,
   };
   const results = await Promise.all(
@@ -73,9 +78,8 @@ export function forgetFingerprint(backend: Backend): void {
   lastFingerprints.delete(backend);
 }
 
-async function readOmp(nowMs: number): Promise<BackendResult> {
+async function readOmp(nowMs: number, refresh: boolean): Promise<BackendResult> {
   const launch = loadProviderLaunch("omp");
-  const usagePromise = readUsage(launch);
   let credentials: ExportedCredential[] | null;
   try {
     credentials = await exportOmpCredentials(launch);
@@ -83,11 +87,25 @@ async function readOmp(nowMs: number): Promise<BackendResult> {
     return { error: error instanceof Error ? error.message : String(error) };
   }
   if (credentials === null) return null;
-  const usage = await usagePromise;
   const fingerprint = JSON.stringify(
     credentials.map(({ provider, credential }) => [provider, credential.email, credential.orgId, credential.authorizedAt]),
   );
+  const usage = await cachedUsage(launch, fingerprint, refresh, nowMs);
   return { accounts: buildAccounts(credentials, usage, nowMs), fingerprint };
+}
+
+/** Failed checks are cached too, so a rate-limited account is not asked again every minute */
+function cachedUsage(
+  launch: ProviderLaunch,
+  fingerprint: string,
+  refresh: boolean,
+  nowMs: number,
+): Promise<UsageSnapshot | null> {
+  const fresh =
+    usageCache !== null && usageCache.fingerprint === fingerprint && nowMs - usageCache.startedAt < USAGE_MAX_AGE_MS;
+  if (usageCache !== null && fresh && !refresh) return usageCache.snapshot;
+  usageCache = { fingerprint, startedAt: nowMs, snapshot: readUsage(launch) };
+  return usageCache.snapshot;
 }
 
 /** omp's stored credentials, identity fields only; null when omp is not installed */

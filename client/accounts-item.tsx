@@ -74,9 +74,15 @@ export function AccountsItem({ theme, layout, openPopover }: PluginSidebarItemPr
   const redacting = settings.status === "ready" && settings.values.redactEmails;
   const headerRef = useRef<View | null>(null);
   const [session, setSession] = useState<LoginSession | null>(null);
+  // Set by a header click so that one list re-runs omp's live usage check instead of reusing it
+  const forceUsageCheck = useRef(false);
   const accounts = useQuery({
     queryKey: ACCOUNTS_QUERY_KEY,
-    queryFn: () => listAccounts({}),
+    queryFn: () => {
+      const refresh = forceUsageCheck.current;
+      forceUsageCheck.current = false;
+      return listAccounts(refresh ? { refresh } : {});
+    },
     refetchInterval: (query) =>
       query.state.data?.setup?.state === "running" ? SETUP_POLL_INTERVAL_MS : ACCOUNTS_POLL_INTERVAL_MS,
   });
@@ -284,7 +290,10 @@ export function AccountsItem({ theme, layout, openPopover }: PluginSidebarItemPr
           id="header"
           icon="KeyRound"
           label={accounts.isFetching ? "Accounts (checking)" : "Accounts"}
-          onPress={() => void accounts.refetch()}
+          onPress={() => {
+            forceUsageCheck.current = true;
+            void accounts.refetch();
+          }}
           trailing={
             <Pressable
               accessibilityRole="button"

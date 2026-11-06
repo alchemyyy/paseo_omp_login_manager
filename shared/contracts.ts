@@ -86,7 +86,8 @@ export type SetupStatus = z.infer<typeof SetupStatusSchema>;
 
 export const listAccountsRpc = defineRpc({
   name: "accounts.list",
-  input: z.object({}),
+  /** Re-run omp's live usage check now instead of reusing the cached result */
+  input: z.object({ refresh: z.boolean().optional() }),
   output: z.object({
     accounts: z.array(AccountSchema),
     /** Backends whose Paseo provider is enabled; disabled ones are not queried or offered for login */
